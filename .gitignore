@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# uv
+# (uv.lock IS committed)
+
+# Test / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local store (raw PDFs + vector index) — never commit user data
+/store/
+.docvault/
+
+# OS
+.DS_Store

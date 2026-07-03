@@ -2,7 +2,7 @@
 name = "docvault"
 version = "0.1.0"
 description = "Local, CLI-driven PDF knowledge base with agentic RAG over Claude"
-readme = "AGENTS.md"
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "chromadb>=0.5",

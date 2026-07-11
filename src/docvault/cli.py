@@ -17,9 +17,9 @@ from typing import Callable
 from docvault.agent import AskAgent, Answer, anthropic_ask_model
 from docvault.boundaries import Embedder, LLMClient
 from docvault.config import Config, load_config
+from docvault.corpus import Corpus
 from docvault.errors import DocVaultError
 from docvault.ingest import FAILED, INGESTED, SKIPPED_DUPLICATE, IngestOutcome, Ingestor
-from docvault.store import DocumentStore
 from docvault.types import Document
 
 DEFAULT_CONFIG = "docvault.yaml"
@@ -95,7 +95,8 @@ def cmd_ask(
 
 
 def cmd_list(*, config: Config) -> str:
-    documents = [s.document for s in DocumentStore(config).list()]
+    # No embedder: listing is a read-only Corpus op, so `list` needs no model.
+    documents = [s.document for s in Corpus(config).documents()]
     return format_list(documents)
 
 

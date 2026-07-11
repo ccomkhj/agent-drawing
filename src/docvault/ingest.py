@@ -12,13 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from docvault.boundaries import Embedder, LLMClient
-from docvault.chunking import chunk_document
 from docvault.config import Config
+from docvault.corpus import Corpus
 from docvault.enrichment import categorize, summarize
 from docvault.errors import DocVaultError
-from docvault.index import VectorIndex
 from docvault.parsing import parse_pdf
-from docvault.store import DocumentStore
 from docvault.types import Document, utc_now
 
 INGESTED = "ingested"
@@ -45,9 +43,7 @@ class Ingestor:
     def __init__(self, config: Config, *, llm: LLMClient, embedder: Embedder) -> None:
         self._config = config
         self._llm = llm
-        self._embedder = embedder
-        self._store = DocumentStore(config)
-        self._index = VectorIndex(config)
+        self._corpus = Corpus(config, embedder=embedder)
 
     def ingest(self, path: str | Path, *, force: bool = False) -> list[IngestOutcome]:
         """Ingest a single PDF or every PDF under a folder.
@@ -70,7 +66,7 @@ class Ingestor:
             parsed = parse_pdf(path)
 
             if not force:
-                existing = self._store.find_by_hash(parsed.content_hash)
+                existing = self._corpus.find_by_hash(parsed.content_hash)
                 if existing is not None:
                     return IngestOutcome(
                         path=path,
@@ -91,12 +87,7 @@ class Ingestor:
                 content_hash=parsed.content_hash,
                 ingested_at=utc_now(),
             )
-            self._store.save(document, path.read_bytes())
-            self._index.add(
-                chunk_document(parsed, document.id),
-                self._embedder,
-                category=document.category,
-            )
+            self._corpus.add(document, path.read_bytes(), parsed)
             return IngestOutcome(path=path, status=INGESTED, document=document)
 
         except DocVaultError as exc:

@@ -1,12 +1,18 @@
-"""Behavior of reindex: rebuild from raw PDFs, and embedder-change handling."""
+"""Behavior of the reindex entry point: rebuild from raw PDFs, and embedder-change
+handling. The rebuild mechanics are covered at the Corpus interface (test_corpus);
+here we exercise the free `reindex()` wrapper the CLI uses, asserting through
+Corpus."""
 
 from __future__ import annotations
 
+import shutil
+
+from chromadb.api.client import SharedSystemClient
+
 from docvault.config import load_config
-from docvault.index import VectorIndex
+from docvault.corpus import Corpus
 from docvault.ingest import Ingestor
 from docvault.reindex import reindex
-from docvault.retrieval import Retriever
 from tests.fakes import FakeEmbedder, FakeLLMClient
 
 
@@ -21,15 +27,17 @@ def test_reindex_rebuilds_from_raw_after_index_loss(config_file, make_pdf, tmp_p
     cfg = load_config(config_file)
     _seed(config_file, make_pdf, tmp_path, FakeEmbedder())
 
-    VectorIndex(cfg).reset()  # simulate a lost/corrupt index
-    assert VectorIndex(cfg).count() == 0
+    # simulate a lost/corrupt index: drop it on disk and evict Chroma's
+    # in-process client cache (which otherwise keeps the deleted data live)
+    shutil.rmtree(cfg.index_dir)
+    SharedSystemClient.clear_system_cache()
+    assert Corpus(cfg, embedder=FakeEmbedder()).search("churn analysis for Q3") == []
 
     n = reindex(cfg, embedder=FakeEmbedder())
 
     assert n == 2
-    assert VectorIndex(cfg).count() > 0
     # searchable again, with provenance intact
-    hit = Retriever(cfg, embedder=FakeEmbedder()).search("churn analysis for Q3")[0]
+    hit = Corpus(cfg, embedder=FakeEmbedder()).search("churn analysis for Q3")[0]
     assert hit.document_name == "paper.pdf"
     assert hit.pages == (1,)
 
@@ -41,8 +49,9 @@ def test_reindex_can_adopt_a_different_embedder(config_file, make_pdf, tmp_path)
     # A different embedding model/dimension would normally mismatch — reindex resets.
     reindex(cfg, embedder=FakeEmbedder(model_id_value="b", dimension_value=16))
 
-    assert VectorIndex(cfg).embedding_metadata() == {"model_id": "b", "dimension": 16}
-    assert VectorIndex(cfg).count() > 0
+    # searchable under the new embedder (a mismatch would have raised instead)
+    corpus = Corpus(cfg, embedder=FakeEmbedder(model_id_value="b", dimension_value=16))
+    assert corpus.search("churn analysis for Q3")[0].document_name == "paper.pdf"
 
 
 def test_reindex_empty_store_is_zero(config_file):

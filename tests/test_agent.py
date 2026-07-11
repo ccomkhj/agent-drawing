@@ -1,12 +1,12 @@
 """The Ask agent, driven offline through the real Strands loop with a scripted
-model plus real tools/retriever/index (seeded via ingest)."""
+model plus real tools/corpus/index (seeded via ingest)."""
 
 from __future__ import annotations
 
 from docvault.agent import AskAgent
 from docvault.config import load_config
+from docvault.corpus import Corpus
 from docvault.ingest import Ingestor
-from docvault.retrieval import Retriever
 from tests.fakes import FakeEmbedder, FakeLLMClient, ScriptedModel, text_turn, tool_turn
 
 
@@ -76,7 +76,7 @@ def test_empty_retrieval_yields_no_citations(config_file):
 
 def test_agent_can_read_a_full_document(config_file, make_pdf, tmp_path):
     _seed(config_file, make_pdf, tmp_path)
-    doc_id = Retriever(load_config(config_file), embedder=FakeEmbedder()).search(
+    doc_id = Corpus(load_config(config_file), embedder=FakeEmbedder()).search(
         "churn analysis for Q3"
     )[0].document_id
     turns = [

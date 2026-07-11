@@ -88,7 +88,7 @@ embedding-model change): the index is disposable because raw PDFs are always kep
 ## Develop
 
 ```bash
-uv run pytest            # 77 offline tests (no network, no API key)
+uv run pytest            # 85 offline tests (no network, no API key)
 ```
 
 Tests drive behavior through **one seam** — the core library API — faking only the
@@ -101,7 +101,7 @@ and the `embeddings` extra is installed.
 ## Project layout
 
 ```
-src/docvault/      core library (config, parsing, ingest, retrieval, agent, cli, …)
+src/docvault/      core library (config, parsing, ingest, corpus, agent, cli, …)
 tests/             pytest suite + fakes
 CONTEXT.md         domain glossary
 docs/adr/          architectural decision records

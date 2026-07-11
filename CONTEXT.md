@@ -36,3 +36,13 @@ retrieval.
 The pipeline that turns a raw PDF into stored, queryable material:
 get PDF → parse → summarize → categorize → file into structured directory (+ keep
 raw) → chunk + embed into the vector index.
+
+### Corpus
+The persisted body of ingested material behind a single interface: the retained
+raw PDFs (the [[Structured directory]]) and the vector index of their [[Chunk]]s,
+owned together. The store-and-index pair never appears in a caller — writing a
+Document (raw first, then chunks) and searching it (semantic lookup joined back to
+provenance) are Corpus operations. Its guarantees: a Document's raw PDF is written
+before its chunks, so a partial write leaves a raw PDF the index rebuild can heal;
+and search never returns a result it cannot fully attribute to a Document and
+page(s).

@@ -16,7 +16,7 @@ from strands.models import Model
 
 from docvault.boundaries import Embedder
 from docvault.config import Config
-from docvault.retrieval import Retriever, SearchHit
+from docvault.corpus import Corpus, SearchHit
 from docvault.types import Citation
 
 _SYSTEM_PROMPT = (
@@ -44,21 +44,21 @@ class AskAgent:
     def __init__(self, config: Config, *, model: Model, embedder: Embedder) -> None:
         self._config = config
         self._model = model
-        self._retriever = Retriever(config, embedder=embedder)
+        self._corpus = Corpus(config, embedder=embedder)
 
     def answer(self, question: str) -> Answer:
         collected: list[SearchHit] = []
         agent = Agent(
             model=self._model,
-            tools=_build_tools(self._retriever, collected),
+            tools=_build_tools(self._corpus, self._config, collected),
             system_prompt=_SYSTEM_PROMPT,
         )
         result = agent(question)
         return Answer(text=str(result).strip(), citations=_citations(collected))
 
 
-def _build_tools(retriever: Retriever, collected: list[SearchHit]) -> list:
-    """The three tools, closed over the retriever and a citation collector."""
+def _build_tools(corpus: Corpus, config: Config, collected: list[SearchHit]) -> list:
+    """The three tools, closed over the corpus, the taxonomy, and a collector."""
 
     @tool
     def search_documents(query: str, category: str | None = None) -> str:
@@ -68,7 +68,7 @@ def _build_tools(retriever: Retriever, collected: list[SearchHit]) -> list:
             query: What to look for, in natural language.
             category: Optional category name to restrict the search to.
         """
-        hits = retriever.search(query, category=category)
+        hits = corpus.search(query, category=category)
         collected.extend(hits)
         if not hits:
             return "No relevant passages found."
@@ -81,7 +81,7 @@ def _build_tools(retriever: Retriever, collected: list[SearchHit]) -> list:
     @tool
     def list_categories() -> str:
         """List the document categories available in the collection."""
-        return ", ".join(retriever.list_categories())
+        return ", ".join(config.categories)
 
     @tool
     def read_full_pdf(document_id: str) -> str:
@@ -90,7 +90,7 @@ def _build_tools(retriever: Retriever, collected: list[SearchHit]) -> list:
         Args:
             document_id: The id shown in search_documents results.
         """
-        text = retriever.read_full_pdf(document_id)
+        text = corpus.read_full(document_id)
         return text if text is not None else f"No document with id {document_id}."
 
     return [search_documents, list_categories, read_full_pdf]

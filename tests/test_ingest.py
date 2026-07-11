@@ -6,14 +6,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from docvault.config import load_config
-from docvault.index import VectorIndex
+from docvault.corpus import Corpus
 from docvault.ingest import FAILED, INGESTED, SKIPPED_DUPLICATE, Ingestor
-from docvault.store import DocumentStore
 from tests.fakes import FakeEmbedder, FakeLLMClient
 
 
 def _ingestor(config_file: Path, llm: FakeLLMClient) -> Ingestor:
     return Ingestor(load_config(config_file), llm=llm, embedder=FakeEmbedder())
+
+
+def _corpus(config_file: Path) -> Corpus:
+    return Corpus(load_config(config_file), embedder=FakeEmbedder())
 
 
 def test_single_file_files_under_category_and_indexes(config_file, born_digital_pdf):
@@ -28,10 +31,10 @@ def test_single_file_files_under_category_and_indexes(config_file, born_digital_
     assert outcome.document.category == "research"
     assert outcome.document.summary == "A concise summary."
 
-    cfg = load_config(config_file)
-    stored = DocumentStore(cfg).get(outcome.document.id)
+    corpus = _corpus(config_file)
+    stored = next(s for s in corpus.documents() if s.document.id == outcome.document.id)
     assert stored.raw_path.parent.name == "research"
-    assert VectorIndex(cfg).count() > 0  # chunks searchable
+    assert corpus.search("Alpha content about churn")  # chunks searchable
 
 
 def test_folder_reports_per_file_outcomes_and_survives_a_bad_file(
@@ -54,7 +57,7 @@ def test_folder_reports_per_file_outcomes_and_survives_a_bad_file(
         "scan.pdf": FAILED,
     }
     # the bad file did not abort the batch: two documents landed
-    assert len(DocumentStore(load_config(config_file)).list()) == 2
+    assert len(_corpus(config_file).documents()) == 2
 
 
 def test_reingesting_identical_file_is_skipped(config_file, born_digital_pdf):
@@ -66,8 +69,7 @@ def test_reingesting_identical_file_is_skipped(config_file, born_digital_pdf):
 
     assert first.status == INGESTED
     assert second.status == SKIPPED_DUPLICATE
-    cfg = load_config(config_file)
-    assert len(DocumentStore(cfg).list()) == 1  # no second entry
+    assert len(_corpus(config_file).documents()) == 1  # no second entry
 
 
 def test_empty_text_pdf_is_a_clear_failure_not_indexed(config_file, empty_text_pdf):
@@ -77,9 +79,9 @@ def test_empty_text_pdf_is_a_clear_failure_not_indexed(config_file, empty_text_p
     assert outcome.status == FAILED
     assert outcome.document is None
     assert "born-digital" in outcome.error
-    cfg = load_config(config_file)
-    assert DocumentStore(cfg).list() == []
-    assert VectorIndex(cfg).count() == 0
+    corpus = _corpus(config_file)
+    assert corpus.documents() == []
+    assert corpus.search("anything") == []
 
 
 def test_llm_offlist_category_files_under_uncategorized(config_file, born_digital_pdf):

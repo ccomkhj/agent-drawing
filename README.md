@@ -31,6 +31,23 @@ Retrieval is **vector RAG** ([ADR-0001](docs/adr/0001-vector-rag-not-directory-r
 structured directory is organization/reference only. The ask path is a genuine
 tool-driven agent ([ADR-0003](docs/adr/0003-strands-agentic-rag.md)), not a fixed pipeline.
 
+## Architecture
+
+The raw PDFs and the vector index are one thing — the **Corpus** — behind a single
+interface. Ingest and ask both go through it; neither touches the store or the
+index directly.
+
+```
+ingest ──┐                       ┌─ raw PDFs      store/raw/<category>/
+         ├──►  Corpus  ──────────┤
+ask ─────┘   add · search        └─ vector index  ChromaDB
+             read_full · rebuild
+```
+
+`Corpus.add` writes the raw PDF first, then its chunks — so a partial write leaves
+a raw PDF that `rebuild` can heal. `Corpus.search` embeds the query and returns
+hits already attributed to a document + page(s).
+
 ## Install
 
 Requires Python ≥3.11 and [uv](https://docs.astral.sh/uv/).
